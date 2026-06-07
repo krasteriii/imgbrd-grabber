@@ -53,8 +53,10 @@ ImagePreview::ImagePreview(QSharedPointer<Image> image, QWidget *container, Prof
 
 ImagePreview::~ImagePreview()
 {
-	m_reply->deleteLater();
-	m_reply = nullptr;
+	if (m_reply != nullptr) {
+		m_reply->deleteLater();
+		m_reply = nullptr;
+	}
 
 	// We don't own the button, but it will likely be deleted soon as well
 	m_bouton = nullptr;
