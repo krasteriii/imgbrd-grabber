@@ -3,7 +3,7 @@ const map = {
     "author_id": "user",
     "name": "title",
     "file_url": "file.path",
-    "created_at": "added",
+    "created_at": "published",
 };
 function parseJsonImage(data: any): IImage {
     const img: IImage = Grabber.mapFields(data, map);
@@ -58,30 +58,34 @@ export const source: ISource = {
             auth: [],
             maxLimit: 50,
             search: {
-                url: (query: ISearchQuery, opts: IUrlOptions): string | IError => {
+                url: (query: ISearchQuery, opts: IUrlOptions): IRequest | IError => {
                     const offset = (query.page - 1) * opts.limit;
+                    let url = "/api/v1/posts?limit=" + opts.limit + "&o=" + offset;
                     if (query.search) {
-                        return {error: "The JSON API does not support arbitrary search."};
+                        url += "&q=" + encodeURIComponent(query.search);
                     }
-                    return "/api/recent?limit=" + opts.limit + "&o=" + offset; // + "&q=" + encodeURIComponent(query.search);
+                    return { url, headers: { "Accept": "text/css" } };
                 },
                 parse: (src: string): IParsedSearch | IError => {
                     const data = JSON.parse(src);
-                    const images: IImage[] = data.map((img: any) => completeImage(parseJsonImage(img)));
-                    return { images };
+                    const images: IImage[] = data.posts.map((img: any) => completeImage(parseJsonImage(img)));
+                    return { images, imageCount: data.true_count };
                 },
             },
             gallery: {
-                url: (query: IGalleryQuery): string => {
+                url: (query: IGalleryQuery): IRequest => {
                     const identity = query.identity!;
-                    return `/api/${identity["service"]}/user/${identity["user"]}/post/${identity["id"]}`;
+                    return {
+                        url: `/api/v1/${identity["service"]}/user/${identity["user"]}/post/${identity["id"]}`,
+                        headers: { "Accept": "text/css" },
+                    };
                 },
                 parse: (src: string): IParsedGallery => {
-                    const data = JSON.parse(src)[0];
-                    const image = parseJsonImage(data);
+                    const post = JSON.parse(src).post;
+                    const image = parseJsonImage(post);
 
                     // Duplicate the root data for each attachment
-                    const images: IImage[] = data["attachments"].map((attachment: any) => completeImage({
+                    const images: IImage[] = post["attachments"].map((attachment: any) => completeImage({
                         ...image,
                         file_url: attachment["path"],
                         type: "image",
@@ -90,7 +94,7 @@ export const source: ISource = {
 
                     return {
                         images,
-                        imageCount: data["attachments"].length,
+                        imageCount: post["attachments"].length,
                         pageCount: 1,
                     };
                 },
@@ -110,7 +114,7 @@ export const source: ISource = {
                     return "/";
                 },
                 parse: (src: string): boolean => {
-                    return src.indexOf("https://github.com/OpenYiff") !== -1;
+                    return src.indexOf("kemono-logo.svg") !== -1;
                 },
             },
         },
