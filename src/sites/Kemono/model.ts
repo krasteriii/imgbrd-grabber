@@ -60,6 +60,18 @@ export const source: ISource = {
             search: {
                 url: (query: ISearchQuery, opts: IUrlOptions): IRequest | IError => {
                     const offset = (query.page - 1) * opts.limit;
+
+                    // Special syntax to browse a specific creator's posts directly: user:<service>:<id>
+                    // (Kemono's own search has no "by author" filter, creators must be browsed by service + ID)
+                    const userMatch = query.search.match(/^user:([a-zA-Z0-9_-]+):(\d+)$/);
+                    if (userMatch) {
+                        const [, service, id] = userMatch;
+                        return {
+                            url: `/api/v1/${service}/user/${id}/posts?o=${offset}`,
+                            headers: { "Accept": "text/css" },
+                        };
+                    }
+
                     let url = "/api/v1/posts?limit=" + opts.limit + "&o=" + offset;
                     if (query.search) {
                         url += "&q=" + encodeURIComponent(query.search);
@@ -68,8 +80,11 @@ export const source: ISource = {
                 },
                 parse: (src: string): IParsedSearch | IError => {
                     const data = JSON.parse(src);
-                    const images: IImage[] = data.posts.map((img: any) => completeImage(parseJsonImage(img)));
-                    return { images, imageCount: data.true_count };
+
+                    // The creator endpoint returns a bare array, the search endpoint wraps results in an object
+                    const posts = Array.isArray(data) ? data : data.posts;
+                    const images: IImage[] = posts.map((img: any) => completeImage(parseJsonImage(img)));
+                    return Array.isArray(data) ? { images } : { images, imageCount: data.true_count };
                 },
             },
             gallery: {
